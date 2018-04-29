@@ -61,6 +61,7 @@ def preprocess(image):
         return image * 2 - 1
 
 
+# invert the preprocessing
 def deprocess(image):
     with tf.name_scope("deprocess"):
         # [-1, 1] => [0, 1]
@@ -485,7 +486,7 @@ def create_model(inputs, targets):
         train=tf.group(update_losses, incr_global_step, gen_train),
     )
 
-
+# save test images out to file after training.
 def save_images(fetches, step=None):
     image_dir = os.path.join(a.output_dir, "images")
     if not os.path.exists(image_dir):
@@ -507,7 +508,7 @@ def save_images(fetches, step=None):
         filesets.append(fileset)
     return filesets
 
-
+# create index.html file to display images.
 def append_index(filesets, step=False):
     index_path = os.path.join(a.output_dir, "index.html")
     if os.path.exists(index_path):
@@ -533,22 +534,28 @@ def append_index(filesets, step=False):
     return index_path
 
 
+# train/test model
 def main():
     if a.seed is None:
         a.seed = random.randint(0, 2**31 - 1)
 
-    tf.set_random_seed(a.seed)
+    # randomly generated numbers are the same across separate sessions
+    tf.set_random_seed(a.seed) 
+    # seed the random generator
     np.random.seed(a.seed)
     random.seed(a.seed)
 
+    # create the output directory if it doesn't exist
     if not os.path.exists(a.output_dir):
         os.makedirs(a.output_dir)
 
-    if a.mode == "test" or a.mode == "export":
+    # make sure there is a pre-trained model to be used on the test data.
+    if a.mode == "test":
         if a.checkpoint is None:
             raise Exception("checkpoint required for test mode")
 
         # load some options from the checkpoint
+        # make sure which direction is set to the correct direction
         options = {"which_direction", "ngf", "ndf", "lab_colorization"}
         with open(os.path.join(a.checkpoint, "options.json")) as f:
             for key, val in json.loads(f.read()).items():
@@ -559,69 +566,15 @@ def main():
         a.scale_size = CROP_SIZE
         a.flip = False
 
+    # print out the information from the model
     for k, v in a._get_kwargs():
         print(k, "=", v)
 
+    # write out the hyperparameters to the options.json file
     with open(os.path.join(a.output_dir, "options.json"), "w") as f:
         f.write(json.dumps(vars(a), sort_keys=True, indent=4))
 
-    if a.mode == "export":
-        # export the generator to a meta graph that can be imported later for standalone generation
-        if a.lab_colorization:
-            raise Exception("export not supported for lab_colorization")
-
-        input = tf.placeholder(tf.string, shape=[1])
-        input_data = tf.decode_base64(input[0])
-        input_image = tf.image.decode_png(input_data)
-
-        # remove alpha channel if present
-        input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 4), lambda: input_image[:,:,:3], lambda: input_image)
-        # convert grayscale to RGB
-        input_image = tf.cond(tf.equal(tf.shape(input_image)[2], 1), lambda: tf.image.grayscale_to_rgb(input_image), lambda: input_image)
-
-        input_image = tf.image.convert_image_dtype(input_image, dtype=tf.float32)
-        input_image.set_shape([CROP_SIZE, CROP_SIZE, 3])
-        batch_input = tf.expand_dims(input_image, axis=0)
-
-        with tf.variable_scope("generator"):
-            batch_output = deprocess(create_generator(preprocess(batch_input), 3))
-
-        output_image = tf.image.convert_image_dtype(batch_output, dtype=tf.uint8)[0]
-        if a.output_filetype == "png":
-            output_data = tf.image.encode_png(output_image)
-        elif a.output_filetype == "jpeg":
-            output_data = tf.image.encode_jpeg(output_image, quality=80)
-        else:
-            raise Exception("invalid filetype")
-        output = tf.convert_to_tensor([tf.encode_base64(output_data)])
-
-        key = tf.placeholder(tf.string, shape=[1])
-        inputs = {
-            "key": key.name,
-            "input": input.name
-        }
-        tf.add_to_collection("inputs", json.dumps(inputs))
-        outputs = {
-            "key":  tf.identity(key).name,
-            "output": output.name,
-        }
-        tf.add_to_collection("outputs", json.dumps(outputs))
-
-        init_op = tf.global_variables_initializer()
-        restore_saver = tf.train.Saver()
-        export_saver = tf.train.Saver()
-
-        with tf.Session() as sess:
-            sess.run(init_op)
-            print("loading model from checkpoint")
-            checkpoint = tf.train.latest_checkpoint(a.checkpoint)
-            restore_saver.restore(sess, checkpoint)
-            print("exporting model")
-            export_saver.export_meta_graph(filename=os.path.join(a.output_dir, "export.meta"))
-            export_saver.save(sess, os.path.join(a.output_dir, "export"), write_meta_graph=False)
-
-        return
-
+    # pre-processing images check function for information.
     examples = load_examples()
     print("examples count = %d" % examples.count)
 
@@ -629,26 +582,10 @@ def main():
     model = create_model(examples.inputs, examples.targets)
 
     # undo colorization splitting on images that we use for display/output
-    if a.lab_colorization:
-        if a.which_direction == "AtoB":
-            # inputs is brightness, this will be handled fine as a grayscale image
-            # need to augment targets and outputs with brightness
-            targets = augment(examples.targets, examples.inputs)
-            outputs = augment(model.outputs, examples.inputs)
-            # inputs can be deprocessed normally and handled as if they are single channel
-            # grayscale images
-            inputs = deprocess(examples.inputs)
-        elif a.which_direction == "BtoA":
-            # inputs will be color channels only, get brightness from targets
-            inputs = augment(examples.inputs, examples.targets)
-            targets = deprocess(examples.targets)
-            outputs = deprocess(model.outputs)
-        else:
-            raise Exception("invalid direction")
-    else:
-        inputs = deprocess(examples.inputs)
-        targets = deprocess(examples.targets)
-        outputs = deprocess(model.outputs)
+    inputs = deprocess(examples.inputs)
+    targets = deprocess(examples.targets)
+    outputs = deprocess(model.outputs)
+
 
     def convert(image):
         if a.aspect_ratio != 1.0:
@@ -668,6 +605,7 @@ def main():
     with tf.name_scope("convert_outputs"):
         converted_outputs = convert(outputs)
 
+    # convert the images to png format and keep inside display_fetches dictionary
     with tf.name_scope("encode_images"):
         display_fetches = {
             "paths": examples.paths,
@@ -676,7 +614,7 @@ def main():
             "outputs": tf.map_fn(tf.image.encode_png, converted_outputs, dtype=tf.string, name="output_pngs"),
         }
 
-    # summaries
+    # summaries, get graphs of inputs outputs and predictions as training continues.
     with tf.name_scope("inputs_summary"):
         tf.summary.image("inputs", converted_inputs)
 
@@ -717,6 +655,7 @@ def main():
             checkpoint = tf.train.latest_checkpoint(a.checkpoint)
             saver.restore(sess, checkpoint)
 
+        # max number of epochs specified by arguments
         max_steps = 2**32
         if a.max_epochs is not None:
             max_steps = examples.steps_per_epoch * a.max_epochs
