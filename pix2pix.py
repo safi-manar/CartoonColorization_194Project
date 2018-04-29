@@ -97,23 +97,15 @@ def discrim_conv(batch_input, out_channels, stride):
 
 
 def gen_conv(batch_input, out_channels):
-    # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
-    initializer = tf.random_normal_initializer(0, 0.02)
-    if a.separable_conv:
-        return tf.layers.separable_conv2d(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same", depthwise_initializer=initializer, pointwise_initializer=initializer)
-    else:
-        return tf.layers.conv2d(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same", kernel_initializer=initializer)
+    # in_dim => in_dim/2
+    # The reason for this is becuase new_dim = (in_dim - 4 + 2)/2 + 1 = in_dim/2
+    return tf.layers.conv2d(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same", kernel_initializer=tf.random_normal_initializer(0, 0.02))
 
 
 def gen_deconv(batch_input, out_channels):
-    # [batch, in_height, in_width, in_channels] => [batch, out_height, out_width, out_channels]
-    initializer = tf.random_normal_initializer(0, 0.02)
-    if a.separable_conv:
-        _b, h, w, _c = batch_input.shape
-        resized_input = tf.image.resize_images(batch_input, [h * 2, w * 2], method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        return tf.layers.separable_conv2d(resized_input, out_channels, kernel_size=4, strides=(1, 1), padding="same", depthwise_initializer=initializer, pointwise_initializer=initializer)
-    else:
-        return tf.layers.conv2d_transpose(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same", kernel_initializer=initializer)
+    #in_dim => in_dim*2, basically performs upsampling/deconvolution
+    # The reason for this is because the kernel size is 4 and the stride is 2. 
+    return tf.layers.conv2d_transpose(batch_input, out_channels, kernel_size=4, strides=(2, 2), padding="same", kernel_initializer=initializer = tf.random_normal_initializer(0, 0.02)
 
 
 def lrelu(x, a):
@@ -322,100 +314,124 @@ def load_examples():
         steps_per_epoch=steps_per_epoch,
     )
 
-
+#This is the generator which is a "U-net". 
 def create_generator(generator_inputs, generator_outputs_channels):
-    layers = []
+    generator_layers = []
 
-    # encoder_1: [batch, 256, 256, in_channels] => [batch, 128, 128, ngf]
-    with tf.variable_scope("encoder_1"):
-        output = gen_conv(generator_inputs, a.ngf)
-        layers.append(output)
+    #number of filters in the first layer, hyperparameter to tune
+    encoding_layer_one_filters = 64
 
-    layer_specs = [
-        a.ngf * 2, # encoder_2: [batch, 128, 128, ngf] => [batch, 64, 64, ngf * 2]
-        a.ngf * 4, # encoder_3: [batch, 64, 64, ngf * 2] => [batch, 32, 32, ngf * 4]
-        a.ngf * 8, # encoder_4: [batch, 32, 32, ngf * 4] => [batch, 16, 16, ngf * 8]
-        a.ngf * 8, # encoder_5: [batch, 16, 16, ngf * 8] => [batch, 8, 8, ngf * 8]
-        a.ngf * 8, # encoder_6: [batch, 8, 8, ngf * 8] => [batch, 4, 4, ngf * 8]
-        a.ngf * 8, # encoder_7: [batch, 4, 4, ngf * 8] => [batch, 2, 2, ngf * 8]
-        a.ngf * 8, # encoder_8: [batch, 2, 2, ngf * 8] => [batch, 1, 1, ngf * 8]
+    #encoding_layer_1: [#inputs, 256, 256, RGB channels(3)] => [#inputs, 128, 128, encoding_layer_one_filters = 64]
+    #We can calculate these dimentions using (256 - 4 + 2)/2 +1= 128. This is because gen_conv uses a kernel
+    #size 4 with stride 2 and padding 1. 
+    with tf.variable_scope("encoding_layer_1"):
+        output = gen_conv(generator_inputs, encoding_layer_one_filters)
+        generator_layers.append(output)
+
+    #number of filters in encoding layers 2-8, hyperparameter to tune
+    #We can calculate the dimensions using (input_dim-filter_dim+padding)/stride+1 = new_dim
+    encoding_layer_filters = [
+        128,    # encoding_layer_2: 
+        256,    # encoding_layer_3: 
+        512,    # encoding_layer_4: 
+        512,    # encoding_layer_5: 
+        512,    # encoding_layer_7: 
+        512,    # encoding_layer_8: 
+        512,    # encoding_layer_9: (Outputs a batch of 1x1s)
     ]
 
-    for out_channels in layer_specs:
+
+    for num_filters in encoding_layer_filters:
         with tf.variable_scope("encoder_%d" % (len(layers) + 1)):
-            rectified = lrelu(layers[-1], 0.2)
-            # [batch, in_height, in_width, in_channels] => [batch, in_height/2, in_width/2, out_channels]
-            convolved = gen_conv(rectified, out_channels)
+            #Pass the most revent layer through leaky_relu and then through the next convolutional layer (the filters specified through encoding_layer_filters)
+            convolved = gen_conv(lrelu(generator_layers[-1], 0.2), num_filters)
+            #Perform batch normalization
             output = batchnorm(convolved)
-            layers.append(output)
+            #Append the output (pre-RELU) to generator_layers
+            generator_layers.append(output)
 
-    layer_specs = [
-        (a.ngf * 8, 0.5),   # decoder_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),   # decoder_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
-        (a.ngf * 8, 0.5),   # decoder_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
-        (a.ngf * 8, 0.0),   # decoder_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
-        (a.ngf * 4, 0.0),   # decoder_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
-        (a.ngf * 2, 0.0),   # decoder_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
-        (a.ngf, 0.0),       # decoder_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
+    #number of filters for each decoding layer, hyperparameter to tune
+    #dropout rate per filter, hyperparameter to tune
+    decoding_layer_specs = [
+        (a.ngf * 8, 0.5),   # decoding_layer_8: [batch, 1, 1, ngf * 8] => [batch, 2, 2, ngf * 8 * 2]
+        (a.ngf * 8, 0.5),   # decoding_layer_7: [batch, 2, 2, ngf * 8 * 2] => [batch, 4, 4, ngf * 8 * 2]
+        (a.ngf * 8, 0.5),   # decoding_layer_6: [batch, 4, 4, ngf * 8 * 2] => [batch, 8, 8, ngf * 8 * 2]
+        (a.ngf * 8, 0.0),   # decoding_layer_5: [batch, 8, 8, ngf * 8 * 2] => [batch, 16, 16, ngf * 8 * 2]
+        (a.ngf * 4, 0.0),   # decoding_layer_4: [batch, 16, 16, ngf * 8 * 2] => [batch, 32, 32, ngf * 4 * 2]
+        (a.ngf * 2, 0.0),   # decoding_layer_3: [batch, 32, 32, ngf * 4 * 2] => [batch, 64, 64, ngf * 2 * 2]
+        (a.ngf, 0.0),       # decoding_layer_2: [batch, 64, 64, ngf * 2 * 2] => [batch, 128, 128, ngf * 2]
     ]
 
+    #Gives the index of the midpoint of the generator (the bottleneck between encoder and decoder) 
     num_encoder_layers = len(layers)
-    for decoder_layer, (out_channels, dropout) in enumerate(layer_specs):
-        skip_layer = num_encoder_layers - decoder_layer - 1
-        with tf.variable_scope("decoder_%d" % (skip_layer + 1)):
+
+    #Decoder layer is a counter (given by the enumerate function) and (
+    for decoder_layer, (num_filters, dropout) in enumerate(layer_specs):
+        #You want to share information from the corresponding layer in the encoder. I.e. encoding_layer_two in the encoder should correspond to decoding_layer_two
+        # in the decoder (Note that the decoding layers are time-reverse labeled. And the first layer of the decoder should not have a shared layer since it
+        # comes directly from the encoder to begin with.
+
+        skip_layer = num_encoder_layers - decoder_layer - 1 #Starts from the midpoint and walk back to transfer information appropriately
+        with tf.variable_scope("decoding_layer_%d" % (skip_layer + 1)):
+            #Right after the bottlneck, decoding_layer_8 is directly connected to encoding_layer_8 anyway, so there is no skip_connection to form here
+            # Therefore, input should just be encoding_layer_8.
             if decoder_layer == 0:
-                # first decoder layer doesn't have skip connections
-                # since it is directly connected to the skip_layer
                 input = layers[-1]
+            #At any other layer, we should be using the previous decoding layer AND the corresponding encoding layer as new information
             else:
                 input = tf.concat([layers[-1], layers[skip_layer]], axis=3)
 
-            rectified = tf.nn.relu(input)
-            # [batch, in_height, in_width, in_channels] => [batch, in_height*2, in_width*2, out_channels]
-            output = gen_deconv(rectified, out_channels)
+            output = gen_deconv(tf.nn.relu(input), num_filters)
             output = batchnorm(output)
 
+            #perform dropout so the model generalizes better (is not deterministic) 
             if dropout > 0.0:
                 output = tf.nn.dropout(output, keep_prob=1 - dropout)
 
-            layers.append(output)
+            generator_layers.append(output)
 
-    # decoder_1: [batch, 128, 128, ngf * 2] => [batch, 256, 256, generator_outputs_channels]
-    with tf.variable_scope("decoder_1"):
+    # decoder_1: ends up with a 256x256 image due to upsampling by a factor of 2 in each layer
+    with tf.variable_scope("decoding_layer_1"):
+        #add the skip connection here
         input = tf.concat([layers[-1], layers[0]], axis=3)
-        rectified = tf.nn.relu(input)
-        output = gen_deconv(rectified, generator_outputs_channels)
+        output = gen_deconv(tf.nn.relu(input), generator_outputs_channels)
         output = tf.tanh(output)
-        layers.append(output)
+        generator_layers.append(output)
 
     return layers[-1]
 
-
 def create_model(inputs, targets):
+    #takes in two tensors
     def create_discriminator(discrim_inputs, discrim_targets):
+        #layers in the discriminator, hyperparameter to tune
         n_layers = 3
-        layers = []
+        #filters in the first discriminator layer, hyperparameter to tune
+        num_layer_one_filters = 64
+                                      
+        discriminator_layers = []
 
         # 2x [batch, height, width, in_channels] => [batch, height, width, in_channels * 2]
         input = tf.concat([discrim_inputs, discrim_targets], axis=3)
 
         # layer_1: [batch, 256, 256, in_channels * 2] => [batch, 128, 128, ndf]
-        with tf.variable_scope("layer_1"):
-            convolved = discrim_conv(input, a.ndf, stride=2)
+        with tf.variable_scope("discriminator_layer_1"):
+            convolved = discrim_conv(input, num_layer_one_filters, stride=2)
             rectified = lrelu(convolved, 0.2)
-            layers.append(rectified)
+            discriminator_layers.append(rectified)
 
         # layer_2: [batch, 128, 128, ndf] => [batch, 64, 64, ndf * 2]
         # layer_3: [batch, 64, 64, ndf * 2] => [batch, 32, 32, ndf * 4]
         # layer_4: [batch, 32, 32, ndf * 4] => [batch, 31, 31, ndf * 8]
         for i in range(n_layers):
-            with tf.variable_scope("layer_%d" % (len(layers) + 1)):
+            with tf.variable_scope("discriminator_layer_%d" % (len(layers) + 1)):
+                #Mirror the 2,4,8,8,8,8,8 pattern in the generator - hyperparameters to tune
+                #Idea-> Define a list and just index into it instead of doing the min thing
                 out_channels = a.ndf * min(2**(i+1), 8)
                 stride = 1 if i == n_layers - 1 else 2  # last layer here has stride 1
                 convolved = discrim_conv(layers[-1], out_channels, stride=stride)
                 normalized = batchnorm(convolved)
                 rectified = lrelu(normalized, 0.2)
-                layers.append(rectified)
+                discriminator_layers.append(rectified)
 
         # layer_5: [batch, 31, 31, ndf * 8] => [batch, 30, 30, 1]
         with tf.variable_scope("layer_%d" % (len(layers) + 1)):
