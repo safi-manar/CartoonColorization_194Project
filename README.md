@@ -35,9 +35,25 @@ r003.pvt.bridges.psc.edu
 3. Record the output of the `hostname` command. In my case, it was `r003.pvt.bridges.psc.edu` .
 
 
+4. Run Tensorboard on the compute node.
+
+```
+(hershal) [and@r003 pix2pix]$ tensorboard --logdir=cartoons_train_large/
+2018-04-29 18:24:31.276787: I tensorflow/core/platform/cpu_feature_guard.cc:140] Your CPU supports instructions that this TensorFlow binary was not compiled to use: SSE4.1 SSE4.2 AVX AVX2 FMA
+TensorBoard 1.7.0 at http://r746.pvt.bridges.psc.edu:6006 (Press CTRL+C to quit)
+W0429 18:25:02.395599 Reloader tf_logging.py:121] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0429 18:25:02.408288 Reloader tf_logging.py:121] Found more than one metagraph event per run. Overwriting the metagraph with the newest event.
+W0429 18:25:03.202126 Reloader tf_logging.py:121] Detected out of order event.step likely caused by a TensorFlow restart. Purging 81050 expired tensor events from Tensorboard display between the previous step: 99999 (timestamp: 1524960007.7093787) and current step: 0 (timestamp: 1524961108.1180243).
+W0429 18:25:03.283502 Reloader tf_logging.py:121] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0429 18:25:03.306437 Reloader tf_logging.py:121] Found more than one metagraph event per run. Overwriting the metagraph with the newest event.
+W0429 18:25:04.907786 Reloader tf_logging.py:121] Found more than one graph event per run, or there was a metagraph containing a graph_def, as well as one or more graph events.  Overwriting the graph with the newest event.
+W0429 18:25:04.920300 Reloader tf_logging.py:121] Found more than one metagraph event per run. Overwriting the metagraph with the newest event.
+W0429 18:25:04.962739 Reloader tf_logging.py:121] Detected out of order event.step likely caused by a TensorFlow restart. Purging 7900 expired tensor events from Tensorboard display between the previous step: 99999 (timestamp: 1524961604.805753) and current step: 0 (timestamp: 1524962102.1517944).
+```
+
 ----
 
-4. On your local computer in a new terminal, create an SSH tunnel from your computer to the compute node.
+5. On your local computer in a new terminal, create an SSH tunnel from your computer to the compute node. Edit the command to use the hostname you recorded above.
 
 ```
 Manars-MacBook-Pro:~ manar$ ssh -L 6006:r003.pvt.bridges.psc.edu:6006 bridges.psc.edu -l and
@@ -69,9 +85,10 @@ Please contact remarks@psc.edu with any comments/concerns.
 This will open up a new SSH window. Do not close it.
 
 
-5. Again, on your local computer, open your browser, and go to: `localhost:6006`.
+6. Again, on your local computer, open your browser, and go to: `localhost:6006`.
 
 
 
 [1]. https://gist.github.com/mcburton/d80e4395cd82737d3677c570aa31ee40
+
 [2]. https://stackoverflow.com/questions/40106949/unable-to-open-tensorboard-in-browser
