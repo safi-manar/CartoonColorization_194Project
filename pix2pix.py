@@ -50,6 +50,7 @@ a = parser.parse_args()
 
 EPS = 1e-12
 CROP_SIZE = 256
+BATCH_SIZE = 1
 
 Examples = collections.namedtuple("Examples", "paths, inputs, targets, count, steps_per_epoch")
 Model = collections.namedtuple("Model", "outputs, predict_real, predict_fake, discrim_loss, discrim_grads_and_vars, gen_loss_GAN, gen_loss_L1, gen_grads_and_vars, train")
@@ -223,6 +224,7 @@ def lab_to_rgb(lab):
 
 
 def load_examples():
+    # Some edge case exception handling...
     if a.input_dir is None or not os.path.exists(a.input_dir):
         raise Exception("input_dir does not exist")
 
@@ -259,18 +261,15 @@ def load_examples():
 
         raw_input.set_shape([None, None, 3])
 
-        if a.lab_colorization:
-            # load color and brightness from image, no B image exists here
-            lab = rgb_to_lab(raw_input)
-            L_chan, a_chan, b_chan = preprocess_lab(lab)
-            a_images = tf.expand_dims(L_chan, axis=2)
-            b_images = tf.stack([a_chan, b_chan], axis=2)
-        else:
-            # break apart image pair and move to range [-1, 1]
-            width = tf.shape(raw_input)[1] # [height, width, channels]
-            a_images = preprocess(raw_input[:,:width//2,:])
-            b_images = preprocess(raw_input[:,width//2:,:])
 
+        # break apart image pair and move to range [-1, 1]
+        width = tf.shape(raw_input)[1] # [height, width, channels]
+        a_images = preprocess(raw_input[:,:width//2,:])
+        b_images = preprocess(raw_input[:,width//2:,:])
+
+    # Set the direction for which way the files are to be trained.
+    # AtoB: Train on inputs A to generate targets B.
+    # BtoA: Train on inputs B to generate targets A.
     if a.which_direction == "AtoB":
         inputs, targets = [a_images, b_images]
     elif a.which_direction == "BtoA":
@@ -283,18 +282,14 @@ def load_examples():
     seed = random.randint(0, 2**31 - 1)
     def transform(image):
         r = image
-        if a.flip:
-            r = tf.image.random_flip_left_right(r, seed=seed)
 
         # area produces a nice downscaling, but does nearest neighbor for upscaling
         # assume we're going to be doing downscaling here
-        r = tf.image.resize_images(r, [a.scale_size, a.scale_size], method=tf.image.ResizeMethod.AREA)
-
-        offset = tf.cast(tf.floor(tf.random_uniform([2], 0, a.scale_size - CROP_SIZE + 1, seed=seed)), dtype=tf.int32)
-        if a.scale_size > CROP_SIZE:
-            r = tf.image.crop_to_bounding_box(r, offset[0], offset[1], CROP_SIZE, CROP_SIZE)
-        elif a.scale_size < CROP_SIZE:
-            raise Exception("scale size cannot be less than crop size")
+        # Resize the image up to 286x286
+        r = tf.image.resize_images(r, [286, 286], method=tf.image.ResizeMethod.AREA)
+        # Then crop only 256x256.
+        offset = tf.cast(tf.floor(tf.random_uniform([2], 0, 256 - CROP_SIZE + 1, seed=seed)), dtype=tf.int32)
+        r = tf.image.crop_to_bounding_box(r, offset[0], offset[1], CROP_SIZE, CROP_SIZE)
         return r
 
     with tf.name_scope("input_images"):
@@ -303,7 +298,9 @@ def load_examples():
     with tf.name_scope("target_images"):
         target_images = transform(targets)
 
-    paths_batch, inputs_batch, targets_batch = tf.train.batch([paths, input_images, target_images], batch_size=a.batch_size)
+    # Default to batch_size == 1.
+    paths_batch, inputs_batch, targets_batch = tf.train.batch([paths, input_images, target_images], batch_size=BATCH_SIZE)
+    # Number of steps per epoch will just be number of images for default BATCH_SIZE=1
     steps_per_epoch = int(math.ceil(len(input_paths) / a.batch_size))
 
     return Examples(
