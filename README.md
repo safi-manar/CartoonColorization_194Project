@@ -72,3 +72,6 @@ This will open up a new SSH window. Do not close it.
 5. Again, on your local computer, open your browser, and go to: `localhost:6006`.
 
 
+
+[1]. https://gist.github.com/mcburton/d80e4395cd82737d3677c570aa31ee40
+[2]. https://stackoverflow.com/questions/40106949/unable-to-open-tensorboard-in-browser
