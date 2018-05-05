@@ -10,7 +10,7 @@
 Using the [Tensorflow pix2pix implementation](https://github.com/affinelayer/pix2pix-tensorflow), we train via:
 
 First, make sure you are in the right directory.
-`cd $SCRATCH/pix2pix2`
+`cd $SCRATCH/pix2pix`
 
 Then run the following:
 
@@ -21,7 +21,7 @@ python pix2pix.py   --mode train   --output_dir cartoons_train_large   --max_epo
 ### Training With the pre-built model for L2 Loss.
 
 First, make sure you are in the right directory.
-`cd $SCRATCH/pix2pix2`
+`cd $SCRATCH/pix2pix`
 
 Then run the following:
 
