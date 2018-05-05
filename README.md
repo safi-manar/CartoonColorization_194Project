@@ -1,9 +1,18 @@
 # 194Project
 
 
+-----
+## Tips for Training
+
+
 ### Training With the pre-built model (with default L1 loss)
 
 Using the [Tensorflow pix2pix implementation](https://github.com/affinelayer/pix2pix-tensorflow), we train via:
+
+First, make sure you are in the right directory.
+`cd $SCRATCH/pix2pix2`
+
+Then run the following:
 
 ```
 python pix2pix.py   --mode train   --output_dir cartoons_train_large   --max_epochs 200   --input_dir cartoons/AB_combined/train/train   --which_direction BtoA
@@ -11,9 +20,24 @@ python pix2pix.py   --mode train   --output_dir cartoons_train_large   --max_epo
 
 ### Training With the pre-built model for L2 Loss.
 
+First, make sure you are in the right directory.
+`cd $SCRATCH/pix2pix2`
+
+Then run the following:
+
 ```
 python pix2pix_L2.py   --mode train   --output_dir L2_results/cartoons_train_large_L2   --max_epochs 200   --input_dir cartoons/AB_combined/train/train   --which_direction BtoA
 ```
+
+### Continue training from previous checkpoint
+
+To continue training, add the checkpoint flag, like:
+```
+--checkpoint cartoons_train_large
+```
+
+-----
+
 
 ## Run TensorBoard remotely on Bridges
 
