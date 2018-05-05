@@ -1,12 +1,18 @@
 # 194Project
 
 
-### Training With the pre-built model
+### Training With the pre-built model (with default L1 loss)
 
 Using the [Tensorflow pix2pix implementation](https://github.com/affinelayer/pix2pix-tensorflow), we train via:
 
 ```
 python pix2pix.py   --mode train   --output_dir cartoons_train_large   --max_epochs 200   --input_dir cartoons/AB_combined/train/train   --which_direction BtoA
+```
+
+### Training With the pre-built model for L2 Loss.
+
+```
+python pix2pix_L2.py   --mode train   --output_dir L2_results/cartoons_train_large_L2   --max_epochs 200   --input_dir cartoons/AB_combined/train/train   --which_direction BtoA
 ```
 
 ## Run TensorBoard remotely on Bridges
