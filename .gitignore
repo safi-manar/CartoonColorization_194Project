@@ -1,3 +1,4 @@
 temp/*
 .ipynb_checkpoints/
 .DS_STORE
+resources/transfer/
