@@ -29,6 +29,23 @@ Then run the following:
 python pix2pix_L2.py   --mode train   --output_dir L2_results/cartoons_train_large_L2   --max_epochs 200   --input_dir cartoons/AB_combined/train/train   --which_direction BtoA
 ```
 
+To test:
+
+```
+python pix2pix_L2.py   --mode test   --output_dir L2_results/cartoons_test_large_L2   --input_dir cartoons/AB_combined/val/   --checkpoint L2_results/cartoons_train_large_L2
+```
+
+### Training With the Squeezed modified model
+
+First, make sure you are in the right directory.
+`cd $SCRATCH/pix2pix`
+
+Then run the following:
+
+```
+python pix2pix_squeezed.py   --mode train   --output_dir squeezed_results/cartoons_train_large_squeezed   --max_epochs 200   --input_dir cartoons/AB_combined/train/train   --which_direction BtoA
+```
+
 ### Continue training from previous checkpoint
 
 To continue training, add the checkpoint flag, like:
