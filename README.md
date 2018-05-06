@@ -71,6 +71,11 @@ To continue training, add the checkpoint flag, like:
 
 ### Test each model above on generalizables.
 
+Test with default (L1) model:
+```
+python pix2pix.py   --mode test   --output_dir L1_results/generalized_L1   --input_dir generalizables/AB/test/   --checkpoint cartoons_train_large
+```
+
 Test with L2:
 ```
 python pix2pix_L2.py   --mode test   --output_dir L2_results/generalized_L2   --input_dir generalizables/AB/test/   --checkpoint L2_results/cartoons_train_large_L2
