@@ -46,6 +46,12 @@ Then run the following:
 python pix2pix_squeezed.py   --mode train   --output_dir squeezed_results/cartoons_train_large_squeezed   --max_epochs 200   --input_dir cartoons/AB_combined/train/train   --which_direction BtoA
 ```
 
+To test:
+
+```
+python pix2pix_squeezed.py   --mode test   --output_dir squeezed_results/cartoons_test_large_squeezed   --input_dir cartoons/AB_combined/val/   --checkpoint squeezed_results/cartoons_train_large_squeezed
+```
+
 ### Continue training from previous checkpoint
 
 To continue training, add the checkpoint flag, like:
