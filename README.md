@@ -60,6 +60,29 @@ To continue training, add the checkpoint flag, like:
 ```
 
 -----
+## Generalizables
+
+
+### Create generalizables
+
+1. Put all `256x256` images in `$SCRATCH/pix2pix/generalizables`, original images in A/ and sketches in B/.
+2. Run `python combine_A_and_B_modified.py --fold_A A/ --fold_B B/ --fold_AB AB/`
+
+
+### Test each model above on generalizables.
+
+Test with L2:
+```
+python pix2pix_L2.py   --mode test   --output_dir L2_results/generalized_L2   --input_dir generalizables/AB/test/   --checkpoint L2_results/cartoons_train_large_L2
+```
+
+Test with Squeezed:
+```
+python pix2pix_squeezed.py   --mode test   --output_dir squeezed_results/generalized_squeezed   --input_dir generalizables/AB/test/   --checkpoint squeezed_results/cartoons_train_large_squeezed
+```
+
+
+-----
 
 
 ## Run TensorBoard remotely on Bridges
