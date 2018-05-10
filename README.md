@@ -17,4 +17,5 @@ The final report is available here: [LINK]
 
 1. https://arxiv.org/pdf/1611.07004.pdf  Isola, Zhu, and Zhou. Image-to-Image Translation with Conditional Adversarial Networks
 2. https://arxiv.org/pdf/1511.06434.pdf A. Radford, L. Metz, and S. Chintala. Unsupervised representation learning with deep convolutional generative adversarial networks.
-3. https://google.github.io/cartoonset/index.html 
+3. https://github.com/affinelayer/pix2pix-tensorflow 
+4. https://google.github.io/cartoonset/index.html 
